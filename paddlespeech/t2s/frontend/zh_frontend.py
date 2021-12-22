@@ -133,12 +133,14 @@ class Frontend():
                     phones.append('sp')
                 if v and v not in self.punc:
                     phones.append(v)
-            # add sp between sentence (replace the last punc with sp)
-            if initials[-1] in self.punc:
-                phones.append('sp')
+
             phones_list.append(phones)
         if merge_sentences:
             merge_list = sum(phones_list, [])
+            # rm the last 'sp' to avoid the noise at the end
+            # cause in the training data, no 'sp' in the end
+            if merge_list[-1] == 'sp':
+                merge_list = merge_list[:-1]
             phones_list = []
             phones_list.append(merge_list)
         return phones_list

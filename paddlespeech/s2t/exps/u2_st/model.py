@@ -136,8 +136,9 @@ class U2STTrainer(Trainer):
             if dist.get_rank() == 0 and self.visualizer:
                 losses_np_v = losses_np.copy()
                 losses_np_v.update({"lr": self.lr_scheduler()})
-                self.visualizer.add_scalars("step", losses_np_v,
-                                            self.iteration - 1)
+                for key, val in losses_np_v.items():
+                    self.visualizer.add_scalar(
+                        tag="train/" + key, value=val, step=self.iteration - 1)
 
     @paddle.no_grad()
     def valid(self):
@@ -233,9 +234,11 @@ class U2STTrainer(Trainer):
             logger.info(
                 'Epoch {} Val info val_loss {}'.format(self.epoch, cv_loss))
             if self.visualizer:
-                self.visualizer.add_scalars(
-                    'epoch', {'cv_loss': cv_loss,
-                              'lr': self.lr_scheduler()}, self.epoch)
+                self.visualizer.add_scalar(
+                    tag='eval/cv_loss', value=cv_loss, step=self.epoch)
+                self.visualizer.add_scalar(
+                    tag='eval/lr', value=self.lr_scheduler(), step=self.epoch)
+
             self.save(tag=self.epoch, infos={'val_loss': cv_loss})
             self.new_epoch()
 
@@ -423,6 +426,24 @@ class U2STTester(U2STTrainer):
             trans.append(''.join([chr(i) for i in ids]))
         return trans
 
+    def translate(self, audio, audio_len):
+        """"E2E translation from extracted audio feature"""
+        cfg = self.config.decoding
+        text_feature = self.test_loader.collate_fn.text_feature
+        self.model.eval()
+
+        hyps = self.model.decode(
+            audio,
+            audio_len,
+            text_feature=text_feature,
+            decoding_method=cfg.decoding_method,
+            beam_size=cfg.beam_size,
+            word_reward=cfg.word_reward,
+            decoding_chunk_size=cfg.decoding_chunk_size,
+            num_decoding_left_chunks=cfg.num_decoding_left_chunks,
+            simulate_streaming=cfg.simulate_streaming)
+        return hyps
+
     def compute_translation_metrics(self,
                                     utts,
                                     audio,
@@ -447,14 +468,7 @@ class U2STTester(U2STTrainer):
             audio_len,
             text_feature=text_feature,
             decoding_method=cfg.decoding_method,
-            lang_model_path=cfg.lang_model_path,
-            beam_alpha=cfg.alpha,
-            beam_beta=cfg.beta,
             beam_size=cfg.beam_size,
-            cutoff_prob=cfg.cutoff_prob,
-            cutoff_top_n=cfg.cutoff_top_n,
-            num_processes=cfg.num_proc_bsearch,
-            ctc_weight=cfg.ctc_weight,
             word_reward=cfg.word_reward,
             decoding_chunk_size=cfg.decoding_chunk_size,
             num_decoding_left_chunks=cfg.num_decoding_left_chunks,

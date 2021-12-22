@@ -579,10 +579,16 @@ class U2BaseModel(ASRInterface, nn.Layer):
             num_decoding_left_chunks, simulate_streaming)
         assert len(hyps) == beam_size
 
-        hyps_pad = pad_sequence([
-            paddle.to_tensor(hyp[0], place=device, dtype=paddle.long)
-            for hyp in hyps
-        ], True, self.ignore_id)  # (beam_size, max_hyps_len)
+        hyp_list = []
+        for hyp in hyps:
+            hyp_content = hyp[0]
+            # Prevent the hyp is empty
+            if len(hyp_content) == 0:
+                hyp_content = (self.ctc.blank_id, )
+            hyp_content = paddle.to_tensor(
+                hyp_content, place=device, dtype=paddle.long)
+            hyp_list.append(hyp_content)
+        hyps_pad = pad_sequence(hyp_list, True, self.ignore_id)
         hyps_lens = paddle.to_tensor(
             [len(hyp[0]) for hyp in hyps], place=device,
             dtype=paddle.long)  # (beam_size,)
@@ -717,13 +723,7 @@ class U2BaseModel(ASRInterface, nn.Layer):
                feats_lengths: paddle.Tensor,
                text_feature: Dict[str, int],
                decoding_method: str,
-               lang_model_path: str,
-               beam_alpha: float,
-               beam_beta: float,
                beam_size: int,
-               cutoff_prob: float,
-               cutoff_top_n: int,
-               num_processes: int,
                ctc_weight: float=0.0,
                decoding_chunk_size: int=-1,
                num_decoding_left_chunks: int=-1,
@@ -737,13 +737,7 @@ class U2BaseModel(ASRInterface, nn.Layer):
             decoding_method (str): decoding mode, e.g.
                     'attention', 'ctc_greedy_search',
                     'ctc_prefix_beam_search', 'attention_rescoring'
-            lang_model_path (str): lm path.
-            beam_alpha (float): lm weight.
-            beam_beta (float): length penalty.
             beam_size (int): beam size for search
-            cutoff_prob (float): for prune.
-            cutoff_top_n (int): for prune.
-            num_processes (int):
             ctc_weight (float, optional): ctc weight for attention rescoring decode mode. Defaults to 0.0.
             decoding_chunk_size (int, optional): decoding chunk size. Defaults to -1.
                     <0: for decoding, use full chunk.
@@ -839,12 +833,13 @@ class U2Model(U2DecodeModel):
     def __init__(self, configs: dict):
         vocab_size, encoder, decoder, ctc = U2Model._init_from_config(configs)
 
+        model_conf = configs.get('model_conf', dict())
         super().__init__(
             vocab_size=vocab_size,
             encoder=encoder,
             decoder=decoder,
             ctc=ctc,
-            **configs['model_conf'])
+            **model_conf)
 
     @classmethod
     def _init_from_config(cls, configs: dict):
@@ -893,15 +888,17 @@ class U2Model(U2DecodeModel):
                                      **configs['decoder_conf'])
 
         # ctc decoder and ctc loss
-        model_conf = configs['model_conf']
+        model_conf = configs.get('model_conf', dict())
+        dropout_rate = model_conf.get('ctc_dropout_rate', 0.0)
+        grad_norm_type = model_conf.get('ctc_grad_norm_type', None)
         ctc = CTCDecoder(
             odim=vocab_size,
             enc_n_units=encoder.output_size(),
             blank_id=0,
-            dropout_rate=model_conf['ctc_dropoutrate'],
+            dropout_rate=dropout_rate,
             reduction=True,  # sum
             batch_average=True,  # sum / batch_size
-            grad_norm_type=model_conf['ctc_grad_norm_type'])
+            grad_norm_type=grad_norm_type)
 
         return vocab_size, encoder, decoder, ctc
 

@@ -19,7 +19,7 @@ from pathlib import Path
 
 import paddle
 from paddle import distributed as dist
-from tensorboardX import SummaryWriter
+from visualdl import LogWriter
 
 from paddlespeech.s2t.training.reporter import ObsScope
 from paddlespeech.s2t.training.reporter import report
@@ -221,6 +221,8 @@ class Trainer():
         if hasattr(self.train_loader, "batch_sampler"):
             batch_sampler = self.train_loader.batch_sampler
             if isinstance(batch_sampler, paddle.io.DistributedBatchSampler):
+                logger.debug(
+                    f"train_loader.batch_sample set epoch: {self.epoch}")
                 batch_sampler.set_epoch(self.epoch)
 
     def before_train(self):
@@ -245,8 +247,9 @@ class Trainer():
         self.maybe_batch_sampler_step()
 
     def after_train_batch(self):
-        if self.args.benchmark_max_step and self.iteration > self.args.benchmark_max_step:
+        if self.args.benchmark_max_step:
             profiler.add_profiler_step(self.args.profiler_options)
+        if self.args.benchmark_max_step and self.iteration > self.args.benchmark_max_step:
             logger.info(
                 f"Reach benchmark-max-step: {self.args.benchmark_max_step}")
             sys.exit(
@@ -309,9 +312,10 @@ class Trainer():
             logger.info(
                 'Epoch {} Val info val_loss {}'.format(self.epoch, cv_loss))
             if self.visualizer:
-                self.visualizer.add_scalars(
-                    'epoch', {'cv_loss': cv_loss,
-                              'lr': self.lr_scheduler()}, self.epoch)
+                self.visualizer.add_scalar(
+                    tag='eval/cv_loss', value=cv_loss, step=self.epoch)
+                self.visualizer.add_scalar(
+                    tag='eval/lr', value=self.lr_scheduler(), step=self.epoch)
 
             # after epoch
             self.save(tag=self.epoch, infos={'val_loss': cv_loss})
@@ -427,7 +431,7 @@ class Trainer():
         unexpected behaviors.
         """
         # visualizer
-        visualizer = SummaryWriter(logdir=str(self.visual_dir))
+        visualizer = LogWriter(logdir=str(self.visual_dir))
         self.visualizer = visualizer
 
     @mp_tools.rank_zero_only

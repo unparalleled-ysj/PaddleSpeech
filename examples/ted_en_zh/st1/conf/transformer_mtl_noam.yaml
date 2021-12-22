@@ -11,9 +11,9 @@ data:
   max_output_input_ratio: 20.0
 
 collator:
-  vocab_filepath: data/lang_char/vocab.txt
+  vocab_filepath: data/lang_char/ted_en_zh_bpe8000.txt
   unit_type: 'spm'
-  spm_model_prefix: data/train_sp.en-zh-nlpr.zh-nlpr_bpe8000_tc
+  spm_model_prefix: data/lang_char/ted_en_zh_bpe8000
   mean_std_filepath: ""
   # augmentation_config: conf/augmentation.json
   batch_size: 10
@@ -68,8 +68,6 @@ model:
     model_conf:
         asr_weight: 0.5
         ctc_weight: 0.3
-        ctc_dropoutrate: 0.0
-        ctc_grad_norm_type: null
         lsm_weight: 0.1     # label smoothing option
         length_normalized_loss: false
 

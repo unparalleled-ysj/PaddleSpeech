@@ -8,7 +8,7 @@ cd ${CUR_DIR}
 sed -i '/set\ -xe/d' run_benchmark.sh
 
 #cd **
-pushd ../../../examples/aishell/s1
+pushd ../../../examples/aishell/asr1
 # 1 安装该模型需要的依赖 (如需开启优化策略请注明)
 # 2 拷贝该模型需要数据、预训练模型
 
@@ -20,7 +20,7 @@ mkdir -p conf/benchmark
 cp conf/conformer.yaml  conf/benchmark/conformer.yaml
 sed -i "s/  accum_grad: 2/  accum_grad: 1/g" conf/benchmark/conformer.yaml
 fp_item_list=(fp32)
-bs_item=(16 30)
+bs_item=(16)
 config_path=conf/benchmark/conformer.yaml
 seed=0
 output=exp/conformer
